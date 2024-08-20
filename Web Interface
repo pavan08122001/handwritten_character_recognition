@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Written Character Recognition</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-image: url('neural_network_background.jpg'); /* Background image */
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .overlay {
+        background-color: rgba(255, 255, 255, 0.8); /* Overlay color */
+        padding: 20px;
+    }
+    .container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        background-color: rgba(255, 255, 255, 0.8); /* Container background color */
+        border-radius: 10px;
+        box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.2);
+        text-align: center;
+    }
+    h1 {
+        font-size: 36px;
+        color: #007bff; /* Blue */
+        text-transform: uppercase;
+        margin-bottom: 20px;
+    }
+    p {
+        font-size: 18px;
+        color: #6c757d; /* Gray */
+        margin-bottom: 20px;
+    }
+    .upload-btn-wrapper {
+        display: inline-block;
+        margin-bottom: 20px;
+    }
+    .btn {
+        border: 2px solid #007bff; /* Blue */
+        color: #007bff; /* Blue */
+        background-color: #ffffff;
+        padding: 8px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s, color 0.2s;
+    }
+    .btn:hover {
+        background-color: #007bff; /* Blue */
+        color: #ffffff;
+        transform: scale(1.1);
+    }
+    input[type="file"] {
+        font-size: 100px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+    #selectedImage {
+        max-width: 100%;
+        margin-top: 20px;
+    }
+    #predictionBox {
+        border: 2px solid #007bff; /* Blue */
+        color: #007bff; /* Blue */
+        background-color: #ffffff;
+        padding: 8px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+</style>
+</head>
+<body>
+    <div class="overlay">
+        <div class="container">
+            <h1>Hand Written Character Recognition</h1>
+            <p>This app predicts the handwritten character. Try to upload the image below:</p>
+            <div class="upload-btn-wrapper">
+                <button class="btn" id="chooseFileBtn">Choose File</button>
+                <input type="file" name="myfile" id="fileInput" />
+            </div>
+            <img id="selectedImage" src="#" alt="Selected Image" style="display: none;">
+            <div id="predictionBox" style="display: none;">Predicted character: <span id="predictionText"></span></div>
+            <button class="btn" id="uploadBtn">Upload</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('chooseFileBtn').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var selectedImage = document.getElementById('selectedImage');
+                    selectedImage.src = e.target.result;
+                    selectedImage.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function uploadFile() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+            if (file) {
+                var formData = new FormData();
+                formData.append('file', file);
+
+                // You can now send this formData to the server using AJAX or any other method you prefer.
+                // For example, using fetch API:
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(data => {
+                    // Handle response from server (data will be the predicted character)
+                    document.getElementById('predictionText').textContent = data;
+                    document.getElementById('predictionBox').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            } else {
+                alert('Please select a file.');
+            }
+        }
+
+        document.getElementById('uploadBtn').addEventListener('click', function() {
+            uploadFile();
+        });
+    </script>
+</body>
+</html>
+
+
+9.3 #FLASK code
+from flask import Flask, render_template, request
+import os
+import cv2
+import numpy as np
+from tensorflow.keras.models import load_model
+
+app = Flask(__name__)
+
+# Load the trained model
+model = load_model('project_model_handwritten.h5')
+
+# Define a dictionary mapping class indices to characters
+word_dict = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H',8:'I',9:'J',10:'K',11:'L',12:'M',13:'N',14:'O',15:'P',16:'Q',17:'R',18:'S',19:'T',20:'U',21:'V',22:'W',23:'X', 24:'Y',25:'Z'}
+def preprocess_image(file_path):
+    # Load the image using OpenCV
+    img = cv2.imread(file_path)
+    # Convert the image to grayscale
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Apply Gaussian blur
+    img_blur = cv2.GaussianBlur(img_gray, (7, 7), 0)
+    # Apply thresholding
+    _, img_thresh = cv2.threshold(img_blur, 100, 255, cv2.THRESH_BINARY_INV)
+    # Resize the image to 28x28
+    img_resized = cv2.resize(img_thresh, (28, 28))
+    # Reshape the image for model input
+    img_input = np.reshape(img_resized, (1, 28, 28, 1))
+    return img_input
+
+# Define route to render HTML form
+@app.route('/test')
+def index():
+    return render_template("index.html")
+
+# Define route to handle image upload and recognition
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    # Get uploaded image file
+    file = request.files['file']
+    # Save image to disk
+    file_path = 'uploads/' + file.filename
+    file.save(file_path)
+    
+    # Preprocess the image and pass it to your trained model for prediction
+    img_input = preprocess_image(file_path)
+    prediction = np.argmax(model.predict(img_input))
+    predicted_character = word_dict[prediction]
+    
+    # Return the recognition result
+    return predicted_character
+
+if __name__ == '__main__':
+    # Ensure 'uploads' folder exists
+    if not os.path.exists('uploads'):
+        os.makedirs('uploads')
+    # Run the Flask app
+    app.run()
